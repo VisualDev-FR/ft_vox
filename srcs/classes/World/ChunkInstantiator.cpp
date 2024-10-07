@@ -1,7 +1,12 @@
 #include <classes/World/ChunkInstantiator.hpp>
 
 bool isInCircle(long int x, long int y, long int radius, long int circleX, long int circleY) {
-	if ((x - circleX) * (x - circleX) + (y - circleY) * (y - circleY) <= radius * radius) {
+
+	// idéalement, passer directement sqrRadius (radius * radius) pour éviter de le re-calculer à chaque tour
+	int dx = x - circleX;
+	int dy = y - circleY;
+
+	if ((dx * dx + dy * dy) <= radius * radius) {
 		return true;
 	}
 	return false;
@@ -83,24 +88,26 @@ void ChunkInstantiator::Update(glm::vec3 playerPos, std::chrono::milliseconds ti
 	const std::vector<std::vector<Chunk *>> &loadedChunks = Chunk::GetLoadedChunks();
 	int size = loadedChunks.size();
 
-	playerPos.x /= Chunk::sizeX;//ChunkSize
-	playerPos.z /= Chunk::sizeY;
+	playerPos.x = playerPos.x >> 4;
+	playerPos.z = playerPos.z >> 4;
 
 	int oldPlayerChunkPosX = playerChunkPosX;
 	int oldPlayerChunkPosY = playerChunkPosY;
 	playerChunkPosX = playerPos.x;
 	playerChunkPosY = playerPos.z;
 
+	int modulo = size - 1;
+
 	if (playerChunkPosX != oldPlayerChunkPosX || playerChunkPosY != oldPlayerChunkPosY) {
 		for (int x = oldPlayerChunkPosX - renderDistance; x <= oldPlayerChunkPosX + renderDistance; x++) { //Deleting chunks
 			for (int y = oldPlayerChunkPosY - renderDistance; y <= oldPlayerChunkPosY + renderDistance; y++) {
-				if (loadedChunks[(x % size + size) % size][(y % size + size) % size] && !isInCircle(x, y, renderDistance, playerChunkPosX, playerChunkPosY)) {
+				if (loadedChunks[((x & modulo) + size) & modulo][((y & modulo) + size) & modulo] && !isInCircle(x, y, renderDistance, playerChunkPosX, playerChunkPosY)) {
 					generationQueueMap.erase(std::pair(x, y));
 					compilationQueueMap.erase(std::pair(x, y));
 					updateQueueMap.erase(std::pair(x, y));
-					vertexArrayObjectHandler->RemoveVAO(chunkMap[loadedChunks[(x % size + size) % size][(y % size + size) % size]]);
-					chunkMap.erase(loadedChunks[(x % size + size) % size][(y % size + size) % size]);
-					delete loadedChunks[(x % size + size) % size][(y % size + size) % size];
+					vertexArrayObjectHandler->RemoveVAO(chunkMap[loadedChunks[((x & modulo) + size) & modulo][((y & modulo) + size) & modulo]]);
+					chunkMap.erase(loadedChunks[((x & modulo) + size) & modulo][((y & modulo) + size) & modulo]);
+					delete loadedChunks[((x & modulo) + size) & modulo][((y & modulo) + size) & modulo];
 				}
 			}
 		}
@@ -117,7 +124,6 @@ void ChunkInstantiator::Update(glm::vec3 playerPos, std::chrono::milliseconds ti
 		}
 	}
 	std::vector<std::pair<int,int>> toErase;
-	
 
 	for (auto const& pos : generationQueueMap)
 	{
